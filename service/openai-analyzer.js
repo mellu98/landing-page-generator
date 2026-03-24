@@ -7,13 +7,49 @@ async function smartFetch(url, options = {}) {
   const apiKey = process.env.SCRAPER_API_KEY;
   if (apiKey && apiKey.trim() !== "") {
     const scraperUrl = `https://api.scraperapi.com/?api_key=${apiKey}&url=${encodeURIComponent(url)}&render=false`;
-    console.log(`Using ScraperAPI for: ${url.slice(0, 50)}...`);
     return fetch(scraperUrl, {
       ...options,
       headers: { ...options.headers, "X-Proxy-Provider": "ScraperAPI" }
     });
   }
   return fetch(url, options);
+}
+
+// Fallback: Usa OpenRouter con un modello capace di navigare il web
+async function fetchWithOpenRouterSearch(url) {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY non configurata su Render.");
+
+  console.log("Using OpenRouter Web Search Fallback for URL:", url);
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "HTTP-Referer": "https://render.com",
+      "X-Title": "Shopify Landing Bot",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.0-flash-001", // Modello con capacità di browsing/visione URL
+      messages: [
+        {
+          role: "system",
+          content: "Sei un analista e-commerce. Accedi al link AliExpress fornito e restituisci SOLO un oggetto JSON con: title, short_title, price, original_price, currency, images (array di URL), description (2 frasi), features (array di 5), category."
+        },
+        {
+          role: "user",
+          content: `Analizza questo prodotto: ${url}`
+        }
+      ],
+      response_format: { type: "json_object" }
+    })
+  });
+
+  const data = await response.json();
+  if (!data.choices?.[0]?.message?.content) {
+    throw new Error("OpenRouter non ha restituito dati validi per il prodotto.");
+  }
+  return JSON.parse(data.choices[0].message.content);
 }
 
 // Step 1: Estrae dati prodotto da AliExpress via fetch + OpenAI enrichment
@@ -62,7 +98,10 @@ export async function extractProductData(url) {
     },
   });
 
-  if (!resp.ok) throw new Error(`Impossibile accedere alla pagina AliExpress: HTTP ${resp.status}`);
+  if (!resp.ok) {
+    console.warn(`Fetch fallito (HTTP ${resp.status}), provo il fallback OpenRouter...`);
+    return await fetchWithOpenRouterSearch(realUrl);
+  }
   const html = await resp.text();
 
   // Estrai dati dal HTML (og tags, immagini, ecc.)
@@ -77,7 +116,8 @@ export async function extractProductData(url) {
   )];
 
   if (!ogTitle) {
-    throw new Error("Impossibile estrarre il titolo del prodotto dalla pagina AliExpress");
+    console.warn("Titolo non trovato nell'HTML, provo il fallback OpenRouter...");
+    return await fetchWithOpenRouterSearch(realUrl);
   }
 
   // Step 1c: Usa OpenAI per analizzare il titolo e arricchire i dati
