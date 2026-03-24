@@ -37,6 +37,21 @@ if (!token || token.trim() === "") {
 const bot = new TelegramBot(token, { polling: true });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Handle polling errors, especially 409 Conflict (multiple instances)
+bot.on('polling_error', (error) => {
+  if (error.code === 'ETELEGRAM' && error.message.includes('409 Conflict')) {
+    console.error("=========================================");
+    console.error("❌ ERRORE DI CONFLITTO (409):");
+    console.error("Un'altra istanza del bot è già attiva con questo token.");
+    console.error("Se il bot è attivo su Render.com, scollega l'istanza remota");
+    console.error("prima di avviarlo in locale.");
+    console.error("=========================================");
+    // Optionally stop polling to avoid log spam, but the error itself usually stops it temporarily
+  } else {
+    console.error("Polling error:", error.code, error.message);
+  }
+});
+
 // ─── Session matching and persistence ───
 const SESSIONS_FILE = join(__dirname, 'sessions.json');
 const STATES_DIR = join(__dirname, 'states');
