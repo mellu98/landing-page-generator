@@ -90,19 +90,26 @@ export async function extractProductData(url) {
   if (!itemIdMatch) throw new Error("URL AliExpress non valido: manca l'item ID");
 
   // Step 1b: Fetch della pagina per estrarre dati dal HTML
-  const resp = await smartFetch(realUrl, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-      "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
-    },
-  });
+  let html = "";
+  let resp;
+  try {
+    resp = await smartFetch(realUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
+      },
+    });
 
-  if (!resp.ok) {
-    console.warn(`Fetch fallito (HTTP ${resp.status}), provo il fallback OpenRouter...`);
+    if (!resp.ok) {
+      console.warn(`Fetch fallito (HTTP ${resp.status}), provo il fallback OpenRouter...`);
+      return await fetchWithOpenRouterSearch(realUrl);
+    }
+    html = await resp.text();
+  } catch (err) {
+    console.warn(`Network error during fetch (${err.message}), provo il fallback OpenRouter...`);
     return await fetchWithOpenRouterSearch(realUrl);
   }
-  const html = await resp.text();
 
   // Estrai dati dal HTML (og tags, immagini, ecc.)
   const ogTitle = html.match(/og:title"\s+content="(.*?)"/)?.[1] || "";
