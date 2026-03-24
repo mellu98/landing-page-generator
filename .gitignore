@@ -1,0 +1,9 @@
+node_modules/
+.env
+.landing-state.json
+generated-images/
+.mcp.json
+tmp_images/
+dump.json
+sessions.json
+states/

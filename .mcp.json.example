@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "landing-page": {
+      "command": "node",
+      "args": ["service/mcp-server.js"],
+      "env": {
+        "OPENAI_API_KEY": "sk-proj-YOUR_OPENAI_KEY_HERE",
+        "OPENROUTER_API_KEY": "sk-or-v1-YOUR_OPENROUTER_KEY_HERE"
+      }
+    }
+  }
+}
